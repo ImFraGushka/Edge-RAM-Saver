@@ -1,0 +1,72 @@
+{
+  "extName": {
+    "message": "Edge RAM Saver"
+  },
+  "extDesc": {
+    "message": "Frees RAM by discarding inactive tabs. Tabs stay in the tab strip and reload when clicked."
+  },
+  "enabledLabel": {
+    "message": "Auto-discard on / off"
+  },
+  "idleLabel": {
+    "message": "Discard after"
+  },
+  "minutes": {
+    "message": "min"
+  },
+  "noSite": {
+    "message": "Not a web page"
+  },
+  "whitelistTitle": {
+    "message": "Whitelist"
+  },
+  "whitelistAdd": {
+    "message": "Never discard"
+  },
+  "whitelistRemove": {
+    "message": "Remove"
+  },
+  "whitelistEmpty": {
+    "message": "Empty — every site can be discarded."
+  },
+  "whitelistPlaceholder": {
+    "message": "example.com"
+  },
+  "add": {
+    "message": "Add"
+  },
+  "rulesTitle": {
+    "message": "Never discard"
+  },
+  "optPinned": {
+    "message": "Pinned tabs"
+  },
+  "optMedia": {
+    "message": "Tabs playing video (even muted)"
+  },
+  "optForms": {
+    "message": "Tabs with unsaved form input"
+  },
+  "optOffline": {
+    "message": "Anything while offline"
+  },
+  "hintAudio": {
+    "message": "Tabs making sound and the tab you are looking at are always protected."
+  },
+  "panic": {
+    "message": "Discard all inactive tabs now"
+  },
+  "panicDone": {
+    "message": "Freed $COUNT$ tab(s)",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "statsLine": {
+    "message": "Sleeping: $SLEEPING$ of $TOTAL$",
+    "placeholders": {
+      "sleeping": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  }
+}

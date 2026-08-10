@@ -1,0 +1,72 @@
+{
+  "extName": {
+    "message": "Edge RAM Saver"
+  },
+  "extDesc": {
+    "message": "Освобождает оперативную память, выгружая неактивные вкладки. Вкладки остаются в панели и перезагружаются по клику."
+  },
+  "enabledLabel": {
+    "message": "Автовыгрузка вкл. / выкл."
+  },
+  "idleLabel": {
+    "message": "Усыплять через"
+  },
+  "minutes": {
+    "message": "мин"
+  },
+  "noSite": {
+    "message": "Не веб-страница"
+  },
+  "whitelistTitle": {
+    "message": "Белый список"
+  },
+  "whitelistAdd": {
+    "message": "Не усыплять"
+  },
+  "whitelistRemove": {
+    "message": "Убрать"
+  },
+  "whitelistEmpty": {
+    "message": "Пусто — усыпляться может любой сайт."
+  },
+  "whitelistPlaceholder": {
+    "message": "example.com"
+  },
+  "add": {
+    "message": "Добавить"
+  },
+  "rulesTitle": {
+    "message": "Никогда не усыплять"
+  },
+  "optPinned": {
+    "message": "Закреплённые вкладки"
+  },
+  "optMedia": {
+    "message": "Вкладки с видео (в том числе без звука)"
+  },
+  "optForms": {
+    "message": "Вкладки с несохранённым вводом в формах"
+  },
+  "optOffline": {
+    "message": "Ничего, пока нет сети"
+  },
+  "hintAudio": {
+    "message": "Вкладки со звуком и вкладка, которую вы смотрите, защищены всегда."
+  },
+  "panic": {
+    "message": "Усыпить все неактивные сейчас"
+  },
+  "panicDone": {
+    "message": "Освобождено вкладок: $COUNT$",
+    "placeholders": {
+      "count": { "content": "$1" }
+    }
+  },
+  "statsLine": {
+    "message": "Спит: $SLEEPING$ из $TOTAL$",
+    "placeholders": {
+      "sleeping": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  }
+}

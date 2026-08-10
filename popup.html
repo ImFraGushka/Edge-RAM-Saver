@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- Шапка: название + мастер-выключатель -->
+    <header class="head">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path fill="currentColor" d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/>
+        </svg>
+        <span data-i18n="extName"></span>
+      </div>
+      <label class="switch" data-i18n-title="enabledLabel">
+        <input type="checkbox" id="enabled">
+        <span class="track"></span>
+      </label>
+    </header>
+
+    <!-- Таймер простоя -->
+    <section class="card row">
+      <label for="idle" data-i18n="idleLabel"></label>
+      <span class="num">
+        <input type="number" id="idle" min="1" max="1440" step="1" inputmode="numeric">
+        <span class="unit" data-i18n="minutes"></span>
+      </span>
+    </section>
+
+    <!-- Текущий сайт -->
+    <section class="card row site">
+      <span class="site-id">
+        <img id="favicon" width="16" height="16" alt="" hidden>
+        <span id="host" class="host"></span>
+      </span>
+      <button id="siteToggle" class="ghost" type="button" hidden></button>
+    </section>
+
+    <!-- Правила защиты -->
+    <section class="card">
+      <h2 data-i18n="rulesTitle"></h2>
+      <label class="check"><input type="checkbox" id="skipPinned"><span data-i18n="optPinned"></span></label>
+      <label class="check"><input type="checkbox" id="deepMediaCheck"><span data-i18n="optMedia"></span></label>
+      <label class="check"><input type="checkbox" id="skipFormInput"><span data-i18n="optForms"></span></label>
+      <label class="check"><input type="checkbox" id="skipOffline"><span data-i18n="optOffline"></span></label>
+      <p class="hint" data-i18n="hintAudio"></p>
+    </section>
+
+    <!-- Белый список -->
+    <section class="card">
+      <h2 data-i18n="whitelistTitle"></h2>
+      <ul id="whitelist" class="list"></ul>
+      <p id="whitelistEmpty" class="hint" data-i18n="whitelistEmpty"></p>
+      <form id="addForm" class="add" autocomplete="off">
+        <input type="text" id="domain" spellcheck="false" data-i18n-placeholder="whitelistPlaceholder">
+        <button type="submit" data-i18n="add"></button>
+      </form>
+    </section>
+
+    <!-- Паник-кнопка -->
+    <button id="panic" class="panic" type="button" data-i18n="panic"></button>
+    <p id="status" class="status"></p>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
