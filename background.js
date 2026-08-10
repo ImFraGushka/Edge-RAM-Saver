@@ -103,6 +103,9 @@ function hostOf(url) {
   }
 }
 
+/** Короткая подпись вкладки для лога в консоли service worker'а. */
+const shortTitle = (tab) => (tab.title || tab.url || '').slice(0, 45);
+
 /** Домен в белом списке? Совпадение по хосту и по любому его поддомену. */
 function isWhitelisted(host, whitelist) {
   return whitelist.some((entry) => host === entry || host.endsWith('.' + entry));
@@ -111,21 +114,25 @@ function isWhitelisted(host, whitelist) {
 /**
  * Дешёвая синхронная проверка «вкладку в принципе можно усыпить?».
  * Никаких инъекций и обращений к странице — только поля объекта Tab.
+ *
+ * @returns {string|null} причина пропуска (для лога) либо null, если можно выгружать
  */
-function isEligible(tab, settings) {
-  if (!tab || typeof tab.id !== 'number') return false;
-  if (tab.active) return false;                       // активная в своём окне
-  if (tab.discarded) return false;                    // уже выгружена
-  if (tab.audible) return false;                      // играет звук
-  if (tab.status && tab.status !== 'complete') return false; // ещё грузится
-  if (settings.skipPinned && tab.pinned) return false;
+function skipReason(tab, settings) {
+  if (!tab || typeof tab.id !== 'number') return 'нет id';
+  if (tab.discarded) return 'уже спит';
+  if (tab.active) return 'активная вкладка окна';
+  if (tab.audible) return 'звучит';
+  if (tab.status && tab.status !== 'complete') return 'ещё грузится';
+  if (settings.skipPinned && tab.pinned) return 'закреплена';
 
   const host = hostOf(tab.url);
-  if (!host) return false;                            // не http(s) — служебная страница
-  if (isWhitelisted(host, settings.whitelist)) return false;
+  if (!host) return 'служебная страница';
+  if (isWhitelisted(host, settings.whitelist)) return 'белый список';
 
-  return true;
+  return null;
 }
+
+const isEligible = (tab, settings) => skipReason(tab, settings) === null;
 
 /* ------------------------------------------------------------------ *
  *  Проба страницы: одна инъекция вместо постоянного content-скрипта
@@ -183,29 +190,58 @@ function probePage() {
   return { media, dirty };
 }
 
+/** Сколько ждём ответ пробы, прежде чем считать вкладку неотвечающей. */
+const PROBE_TIMEOUT_MS = 1500;
+
+const PROBE_TIMED_OUT = Symbol('probe-timed-out');
+
 /**
- * Занята ли вкладка? Одна инъекция во все фреймы (allFrames важен: плееры
- * YouTube/Vimeo на сторонних сайтах живут во вложенном iframe).
- * Постоянного content-скрипта нет — код исполняется разово и сразу исчезает.
+ * Одна инъекция во все фреймы (allFrames важен: плееры YouTube/Vimeo на
+ * сторонних сайтах живут во вложенном iframe). Постоянного content-скрипта
+ * нет — код исполняется разово и сразу исчезает.
  *
- * При ошибке инъекции (страница Web Store, PDF-viewer, политика сайта)
- * ведём себя консервативно и считаем вкладку занятой: лучше не сэкономить
- * память, чем выгрузить страницу с недописанным текстом.
+ * Таймаут обязателен: вкладка, замороженная встроенным «Режимом эффективности»
+ * Edge, скрипты не исполняет, и без гонки с таймером этот await не завершился бы
+ * никогда — проход вис бы на первой же такой вкладке.
+ *
+ * setTimeout здесь допустим в отличие от планирования: он живёт только внутри
+ * активного прохода, а не пытается пережить сон service worker'а.
  */
-async function isBusy(tabId, settings) {
+function probeTab(tabId) {
+  const injection = chrome.scripting.executeScript({
+    target: { tabId, allFrames: true },
+    func: probePage,
+    injectImmediately: true
+  });
+  const timeout = new Promise((resolve) => setTimeout(resolve, PROBE_TIMEOUT_MS, PROBE_TIMED_OUT));
+  return Promise.race([injection, timeout]);
+}
+
+/**
+ * @returns {Promise<string|null>} причина пропуска либо null, если можно выгружать
+ */
+async function busyReason(tabId, settings) {
+  let frames;
   try {
-    const frames = await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      func: probePage,
-      injectImmediately: true
-    });
-    return frames.some(({ result }) => result && (
-      (settings.deepMediaCheck && result.media) ||
-      (settings.skipFormInput && result.dirty)
-    ));
-  } catch {
-    return true;
+    frames = await probeTab(tabId);
+  } catch (error) {
+    // Страница запрещает инъекцию (Web Store, PDF-viewer, политика сайта).
+    // Здесь остаёмся консервативными: не знаем, что на странице, — не трогаем.
+    return `проба отклонена: ${error.message}`;
   }
+
+  // Вкладка не ответила за отведённое время — она заморожена браузером.
+  // Замороженная страница гарантированно ничего не проигрывает, а Edge уже
+  // признал её ненужной. Именно такие вкладки и держат основную память
+  // (заморозка heap не освобождает), поэтому выгружаем.
+  if (frames === PROBE_TIMED_OUT) return null;
+
+  for (const { result } of frames) {
+    if (!result) continue;
+    if (settings.deepMediaCheck && result.media) return 'играет медиа';
+    if (settings.skipFormInput && result.dirty) return 'несохранённый ввод';
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -237,6 +273,9 @@ async function sweep(force = false) {
   const seed = {};
   const candidates = [];
 
+  // Что произошло с каждой вкладкой — выводится таблицей в консоль SW.
+  const report = [];
+
   for (const tab of tabs) {
     const key = activityKey(tab.id);
     liveKeys.add(key);
@@ -246,10 +285,19 @@ async function sweep(force = false) {
     // перезапуска браузера) — засчитываем ей текущее время, а не выгружаем разом.
     if (typeof stamp !== 'number') seed[key] = now;
 
-    if (!isEligible(tab, settings)) continue;
+    const reason = skipReason(tab, settings);
+    if (reason) {
+      if (reason !== 'уже спит') report.push({ вкладка: shortTitle(tab), итог: reason });
+      continue;
+    }
 
     const last = typeof stamp === 'number' ? stamp : now;
-    if (force || now - last >= idleMs) candidates.push(tab);
+    if (force || now - last >= idleMs) {
+      candidates.push(tab);
+    } else {
+      const left = Math.ceil((idleMs - (now - last)) / 60_000);
+      report.push({ вкладка: shortTitle(tab), итог: `ждёт ещё ~${left} мин` });
+    }
   }
 
   // Чистим ключи закрытых вкладок: страховка на случай пропущенного onRemoved
@@ -262,23 +310,41 @@ async function sweep(force = false) {
     stale.length ? chrome.storage.session.remove(stale) : null
   ]);
 
-  let discarded = 0;
   const needsProbe = settings.deepMediaCheck || settings.skipFormInput;
 
-  for (const tab of candidates) {
-    if (needsProbe && await isBusy(tab.id, settings)) {
+  // Пробы идут параллельно: одна неотвечающая вкладка больше не задерживает
+  // остальные. Раньше цикл был последовательным, и замороженная вкладка
+  // подвешивала весь проход целиком.
+  const probed = await Promise.all(candidates.map(async (tab) => ({
+    tab,
+    reason: needsProbe ? await busyReason(tab.id, settings) : null
+  })));
+
+  let discarded = 0;
+
+  for (const { tab, reason } of probed) {
+    if (reason) {
       // Вкладка занята — сбрасываем её таймер, чтобы не дёргать пробу каждую
       // минуту, пока пользователь смотрит двухчасовой фильм.
       await touch(tab.id);
+      report.push({ вкладка: shortTitle(tab), итог: reason });
       continue;
     }
     try {
       await chrome.tabs.discard(tab.id);
       discarded++;
-    } catch {
-      // Гонка: вкладку успели закрыть или сделать активной. Молча пропускаем.
+      report.push({ вкладка: shortTitle(tab), итог: 'ВЫГРУЖЕНА' });
+    } catch (error) {
+      // Гонка: вкладку успели закрыть или сделать активной.
+      report.push({ вкладка: shortTitle(tab), итог: `discard не удался: ${error.message}` });
     }
   }
+
+  console.log(
+    `[RAM Saver] ${force ? 'паник-кнопка' : 'проход по таймеру'}: ` +
+    `вкладок ${tabs.length}, кандидатов ${candidates.length}, выгружено ${discarded}`
+  );
+  if (report.length) console.table(report);
 
   await refreshBadge();
   await scheduleNextSweep();
